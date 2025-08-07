@@ -1,0 +1,11 @@
+[project]
+name = "dbt-test"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "dbt-hive>=1.9.0",
+    "dbt-spark[pyhive]>=1.9.3",
+    "wheel>=0.45.1",
+]

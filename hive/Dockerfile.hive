@@ -1,0 +1,92 @@
+FROM openjdk:18-slim
+
+# see https://hadoop.apache.org/releases.html
+ARG HADOOP_VERSION=3.3.4
+# see https://downloads.apache.org/hive/
+# https://archive.apache.org/dist/hive/
+ARG HIVE_METASTORE_VERSION=4.0.0
+# see https://jdbc.postgresql.org/download.html#current
+ARG POSTGRES_CONNECTOR_VERSION=42.7.3
+
+#see https://iceberg.apache.org/releases/
+ARG ICEBERG_VERSION=1.8.1
+
+ARG DELTALAKE_VERSION=3.3.0
+
+# Set necessary environment variables.
+ENV HIVE_HOME=/opt/hive
+ENV PATH=${HIVE_HOME}/bin:${PATH}
+ENV HADOOP_HOME="/opt/hadoop"
+ENV PATH="/opt/spark/bin:/opt/hadoop/bin:${PATH}"
+
+ENV DATABASE_DRIVER=org.postgresql.Driver
+ENV DATABASE_TYPE=postgres
+ENV DATABASE_TYPE_JDBC=postgresql
+ENV DATABASE_PORT=5432
+
+WORKDIR /app
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
+# hadolint ignore=DL3008
+RUN \
+    echo "Install OS dependencies" && \
+    build_deps="curl" && \
+    apt-get update -y && \
+    apt-get install -y $build_deps net-tools --no-install-recommends
+
+RUN \
+    echo "Download and extract the Hadoop binary package" && \
+    curl -sL https://archive.apache.org/dist/hadoop/core/hadoop-$HADOOP_VERSION/hadoop-$HADOOP_VERSION.tar.gz \
+    | tar xvz -C /opt/ && \
+    ln -s /opt/hadoop-$HADOOP_VERSION /opt/hadoop && \
+    rm -r /opt/hadoop/share/doc
+
+RUN \
+    echo "Add S3a jars to the classpath using this hack" && \
+    ln -s /opt/hadoop/share/hadoop/tools/lib/hadoop-aws* /opt/hadoop/share/hadoop/common/lib/ && \
+    ln -s /opt/hadoop/share/hadoop/tools/lib/aws-java-sdk* /opt/hadoop/share/hadoop/common/lib/
+
+RUN \
+    echo "Download and install hive-metastore binary" && \
+    mkdir -p $HIVE_HOME && set -ex && export  HIVE_MIRROR=https://archive.apache.org/dist/ \
+    && curl -fsSL ${HIVE_MIRROR}/hive/hive-${HIVE_METASTORE_VERSION}/apache-hive-${HIVE_METASTORE_VERSION}-bin.tar.gz | \
+    tar xz --strip-components=1 -C ${HIVE_HOME}
+
+RUN \
+    echo "Download and install the database connector" && \
+    curl -sL https://jdbc.postgresql.org/download/postgresql-$POSTGRES_CONNECTOR_VERSION.jar --output /opt/postgresql-$POSTGRES_CONNECTOR_VERSION.jar && \
+    ln -s /opt/postgresql-$POSTGRES_CONNECTOR_VERSION.jar /opt/hadoop/share/hadoop/common/lib/ && \
+    ln -s /opt/postgresql-$POSTGRES_CONNECTOR_VERSION.jar $HIVE_HOME/lib/
+
+RUN \
+    echo "Download and install Iceberg connector" && \
+    curl -sL https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-spark-runtime-3.5_2.12/$ICEBERG_VERSION/iceberg-spark-runtime-3.5_2.12-$ICEBERG_VERSION.jar --output /opt/iceberg-spark-runtime-3.5_2.12-$ICEBERG_VERSION.jar && \
+    ln -s /opt/iceberg-spark-runtime-3.5_2.12-$ICEBERG_VERSION.jar /opt/hadoop/share/hadoop/common/lib/ && \
+    ln -s /opt/iceberg-spark-runtime-3.5_2.12-$ICEBERG_VERSION.jar $HIVE_HOME/lib/
+
+
+RUN \
+    echo "Download and install Iceberg hive connector" && \
+    curl -sL https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-hive-runtime/$ICEBERG_VERSION/iceberg-hive-runtime-$ICEBERG_VERSION.jar --output /opt/iceberg-hive-runtime-$ICEBERG_VERSION.jar && \
+    ln -s /opt/iceberg-hive-runtime-$ICEBERG_VERSION.jar /opt/hadoop/share/hadoop/common/lib/ && \
+    ln -s /opt/iceberg-hive-runtime-$ICEBERG_VERSION.jar $HIVE_HOME/lib/
+
+RUN \
+    echo "Download and install Delta Lake connector" && \
+    curl -sL https://repo1.maven.org/maven2/io/delta/delta-core_2.12/$DELTALAKE_VERSION/delta-core_2.12-$DELTALAKE_VERSION.jar --output /opt/delta-core_2.12-$DELTALAKE_VERSION.jar && \
+    ln -s /opt/delta-core_2.12-$DELTALAKE_VERSION.jar /opt/hadoop/share/hadoop/common/lib/ && \
+    ln -s /opt/delta-core_2.12-$DELTALAKE_VERSION.jar $HIVE_HOME/lib/
+
+RUN \
+    echo "Purge build artifacts" && \
+    apt-get purge -y --auto-remove $build_deps && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+COPY ./run.sh run.sh
+
+RUN chmod +x run.sh
+
+HEALTHCHECK CMD netstat -ln | grep 9083 || exit 1
+
+CMD [ "./run.sh" ]

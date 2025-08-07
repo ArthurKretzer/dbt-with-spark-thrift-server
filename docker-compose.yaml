@@ -1,0 +1,105 @@
+services:
+  storage:
+    image: quay.io/minio/minio:RELEASE.2024-08-29T01-40-52Z
+    environment:
+      - MC_CONFIG_DIR=/tmp/.mc
+      - MINIO_CONFIG_ENV_FILE=/etc/config.env
+    ports:
+      - "9001:9001" # Console port
+      - "9000:9000" # API port
+    volumes:
+      - data-lake-storage-volume:/root/.minio:rw
+      - data-lake-storage-volume:/data-1:rw
+      - ./minio/.env:/etc/config.env:rw
+    command: server --console-address ":9001"
+    restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "1"
+    networks:
+      - data-lake-network
+        
+  createbuckets:
+    image: minio/mc:RELEASE.2024-08-26T10-49-58Z
+    env_file:
+      - ./minio/.env
+    volumes:
+      - ./minio/createbucket.sh:/createbucket.sh:rw
+    depends_on:
+      - storage
+    entrypoint: /bin/sh /createbucket.sh
+    networks:
+      - data-lake-network
+
+  hive-metastore:
+    # image: apache/hive:4.0.0
+    build:
+      context: ./hive/
+      dockerfile: Dockerfile.hive
+    container_name: hive-metastore
+    env_file:
+      - ./hive/.env
+    ports:
+      - "9083:9083"
+    depends_on:
+      hive-postgres:
+        condition: service_healthy
+    restart: on-failure
+    networks:
+      - data-lake-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "1"
+
+  hive-postgres:
+    image: postgres:16-alpine
+    container_name: hive-postgres
+    env_file:
+      - ./hive/.env
+    ports:
+      - "5432:5432"
+    volumes:
+      - hive_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U hive" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: on-failure
+    networks:
+      - data-lake-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "1"
+
+  spark-thrift:
+    build: ./thrift_server
+    env_file:
+      - ./thrift_server/.env
+    container_name: spark-thrift
+    ports:
+      - 10000:10000
+      - 7077:7077
+      - 8080:8080
+    networks:
+      - data-lake-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "1"
+    depends_on:
+      - hive-metastore
+
+volumes:
+  data-lake-storage-volume:
+  hive_postgres_data:
+
+networks:
+  data-lake-network:
