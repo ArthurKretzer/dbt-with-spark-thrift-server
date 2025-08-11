@@ -62,6 +62,7 @@ It is designed to help developers and data engineers bootstrap lakehouse stacks 
 Make sure Docker and Docker Compose are installed.
 
 ```bash
+cp minio/.env-example minio/.env && cp thrift_server/.env-example thrift_server/.env && cp hive/.env-example hive/.env
 docker-compose up -d
 ```
 
