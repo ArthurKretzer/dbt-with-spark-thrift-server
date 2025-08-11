@@ -128,11 +128,15 @@ run_migrations(){
 }
 
 # configure & run schematool
+set +x
 generate_hive_site_config /opt/hadoop/etc/hadoop/hive-site.xml
+set -x
 run_migrations
 
 # configure & start metastore (in foreground)
+set +x
 generate_metastore_site_config $HIVE_HOME/conf/metastore-site.xml
 generate_core_site_config /opt/hadoop/etc/hadoop/core-site.xml
+set -x
 $HIVE_HOME/bin/hive --service metastore
 # $HIVE_home/bin/start-metastore
