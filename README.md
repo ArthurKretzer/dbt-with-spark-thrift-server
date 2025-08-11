@@ -20,6 +20,7 @@ It is designed to help developers and data engineers bootstrap lakehouse stacks 
   - [⚙️ Python Environment Setup (UV)](#️-python-environment-setup-uv)
   - [🔧 DBT Commands](#-dbt-commands)
   - [🧪 Connect to Spark Thrift Server with Beeline](#-connect-to-spark-thrift-server-with-beeline)
+  - [Gotchas](#gotchas)
   - [📝 License](#-license)
 
 ---
@@ -158,6 +159,16 @@ You can manually test the Spark Thrift Server connection using Beeline, the JDBC
     ```bash
     select * from default.my_first_dbt_model;
     ```
+
+---
+
+## Gotchas
+
+- **One warehouse & consistent URIs**: use the same spark.sql.warehouse.dir and S3A config across producers/consumers so paths resolve identically.
+
+- **Threads/Concurrency in dbt**: if you switch catalogs inside hooks, keep threads: 1, or run Delta and Iceberg builds separately to avoid session cross-talk.
+
+- **Hive reading Delta**: HMS registration makes the table discoverable, but vanilla Hive can’t read Delta without special connectors. Spark/Trino/Athena need their own Delta readers (e.g., symlink manifest for Presto/Athena if needed).
 
 ---
 
