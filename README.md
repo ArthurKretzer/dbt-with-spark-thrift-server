@@ -20,6 +20,8 @@ It is designed to help developers and data engineers bootstrap lakehouse stacks 
   - [⚙️ Python Environment Setup (UV)](#️-python-environment-setup-uv)
   - [🔧 DBT Commands](#-dbt-commands)
   - [🧪 Connect to Spark Thrift Server with Beeline](#-connect-to-spark-thrift-server-with-beeline)
+    - [Iceberg](#iceberg)
+    - [Delta Lake](#delta-lake)
   - [Gotchas](#gotchas)
   - [📝 License](#-license)
 
@@ -134,10 +136,14 @@ You can edit or add models inside ``spark_dbt_project/models/`` and rerun ``dbt 
 
 You can manually test the Spark Thrift Server connection using Beeline, the JDBC CLI for Hive and Spark SQL.
 
+If any errors occur, DBT will also not work.
+
+### Iceberg
+
 1. Open a terminal inside the Spark Thrift Server container:
 
     ```bash
-    docker exec -it spark-thrift /bin/bash
+    docker exec -it spark-thrift-iceberg /bin/bash
     ```
 
 2. Start Beeline:
@@ -156,72 +162,69 @@ You can manually test the Spark Thrift Server connection using Beeline, the JDBC
 
     >If authentication is not required, just press Enter when prompted for username and password.
 
-4. Run some tests:
+4. Run Spark Thrift Server tests:
 
     ```sql
-    SHOW CATALOGS;
-    ```
-
-    First execution should only output:
-
-    ```bash
-    +----------------+
-    |    catalog     |
-    +----------------+
-    | spark_catalog  |
-    +----------------+
-    1 row selected (1.212 seconds)
-    ```
-
-    ``spark_catalog`` is for delta tables as it only support this naming format.
-
-    Iceberg catalog will only be seen after a table creation or interaction. So let's create a sample one:
-
-    ```sql
-    CREATE TABLE iceberg.default.sample_iceberg (
+    CREATE TABLE default.sample_iceberg (
         id INT,
         name STRING
     )
     USING iceberg
     LOCATION 's3a://lakehouse/iceberg/sample_iceberg';
 
-    INSERT INTO iceberg.default.sample_iceberg VALUES (1,'Alice'),(2,'Bob');
+    INSERT INTO default.sample_iceberg VALUES (1,'Alice'),(2,'Bob');
 
-    SELECT * FROM iceberg.default.sample_iceberg;
+    SELECT * FROM default.sample_iceberg;
 
     SHOW CATALOGS;
     ```
 
-    You should now see both catalogs:
+### Delta Lake
+
+1. Open a terminal inside the Spark Thrift Server container:
 
     ```bash
-    SHOW CATALOGS;
-    +----------------+
-    |    catalog     |
-    +----------------+
-    | iceberg        |
-    | spark_catalog  |
-    +----------------+
-    2 rows selected (0.031 seconds)
+    docker exec -it spark-thrift-delta /bin/bash
     ```
 
-    **Note:** always use fully qualified names for tables considering catalog.schema.table. `USE CATALOG iceberg` will not work.
+2. Start Beeline:
 
-    Finally you can try the same for delta tables using `spark_catalog` and creating a table with:
+    ```bash
+    /opt/spark/bin/beeline
+    ```
+
+    You should now see the ``beeline>`` prompt.
+
+3. Connect to the Spark Thrift Server:
+
+    ```bash
+    !connect jdbc:hive2://localhost:10000
+    ```
+
+    >If authentication is not required, just press Enter when prompted for username and password.
+
+4. Run Spark Thrift Server tests:
 
     ```sql
-    ...
+    CREATE TABLE default.sample_delta (
+        id INT,
+        name STRING
+    )
     USING delta
     LOCATION 's3a://lakehouse/delta/sample_delta';
-    ```
 
-    If any errors occur, DBT will not work as well.
+    INSERT INTO default.sample_delta VALUES (1,'Alice'),(2,'Bob');
+
+    SELECT * FROM default.sample_delta;
+
+    SHOW CATALOGS;
+    ```
 
 ---
 
 ## Gotchas
 
-- Although we can configure a spark session to have two catalogs (delta and iceberg) and a thrift server as such, we can't configure DBT to accept the catalog specification as stated [in the docs](https://docs.getdbt.com/reference/resource-configs/spark-configs#always-schema-never-database).
+- Although we can configure a spark session to have two catalogs (delta and iceberg) and a thrift server as such, we can't configure DBT to accept the catalog specification (``catalog.schema.table``) as stated [in the docs](https://docs.getdbt.com/reference/resource-configs/spark-configs#always-schema-never-database).
 
 ---
 
