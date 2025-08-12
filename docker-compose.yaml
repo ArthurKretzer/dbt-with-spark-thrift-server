@@ -78,6 +78,56 @@ services:
         max-size: "50m"
         max-file: "1"
 
+  spark-master:
+    build: ./thrift_server
+    env_file:
+      - ./thrift_server/.env
+    container_name: spark-master
+    environment:
+      SPARK_MODE: master
+      SPARK_MASTER_HOST: 0.0.0.0
+      SPARK_MASTER_PORT: 7077
+      SPARK_MASTER_WEBUI_PORT: 8080
+    ports:
+      - 8080:8080
+      - 8081:8081
+    entrypoint: ["/opt/spark/bin/spark-class", "org.apache.spark.deploy.master.Master", "--host", "0.0.0.0", "--port", "7077"]
+    networks: [ data-lake-network ]
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 7077"]
+      interval: 10s
+      timeout: 3s
+      retries: 20
+      start_period: 20s
+
+  spark-worker-1:
+    build: ./thrift_server
+    env_file:
+      - ./thrift_server/.env
+    container_name: spark-worker-1
+    depends_on: [ spark-master ]
+    environment:
+      SPARK_MODE: worker
+      SPARK_WORKER_CORES: 2
+      SPARK_WORKER_MEMORY: 4G
+      SPARK_MASTER_URL: spark://spark-master:7077
+      SPARK_WORKER_WEBUI_PORT: 8081
+    entrypoint: ["/opt/spark/bin/spark-class", "org.apache.spark.deploy.worker.Worker", "spark://spark-master:7077", "--cores", "2", "--memory", "4G"]
+    networks: [ data-lake-network ]
+
+  spark-history:
+    build: ./thrift_server
+    container_name: spark-history
+    env_file:
+      - ./thrift_server/.env
+    environment:
+      SPARK_MODE: history
+    command: ["/opt/spark/bin/spark-class","org.apache.spark.deploy.history.HistoryServer"]
+    ports:
+      - "18080:18080"
+    networks: [ data-lake-network ]
+    depends_on: [ hive-metastore ]
+  
   spark-thrift-iceberg:
     build: ./thrift_server
     env_file:
@@ -85,10 +135,9 @@ services:
     container_name: spark-thrift-iceberg
     environment:
       SPARK_ENGINE: iceberg
+      SPARK_MASTER: spark://spark-master:7077
     ports:
       - 10001:10000
-      - 7078:7077
-      - 8081:8080
     networks:
       - data-lake-network
     logging:
@@ -96,8 +145,7 @@ services:
       options:
         max-size: "50m"
         max-file: "1"
-    depends_on:
-      - hive-metastore
+    depends_on: [ spark-master, spark-worker-1, hive-metastore ]
   
   spark-thrift-delta:
     build: ./thrift_server
@@ -108,8 +156,6 @@ services:
       SPARK_ENGINE: delta
     ports:
       - 10000:10000
-      - 7077:7077
-      - 8080:8080
     networks:
       - data-lake-network
     logging:
