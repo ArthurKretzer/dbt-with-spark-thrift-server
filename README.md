@@ -154,11 +154,66 @@ You can manually test the Spark Thrift Server connection using Beeline, the JDBC
 
     >>If authentication is not required, just press Enter when prompted for username and password.
 
-4. Run a simple query:
+4. Run some tests:
+
+    ```sql
+    SHOW CATALOGS;
+    ```
+
+    First execution should only output:
 
     ```bash
-    select * from default.my_first_dbt_model;
+    +----------------+
+    |    catalog     |
+    +----------------+
+    | spark_catalog  |
+    +----------------+
+    1 row selected (1.212 seconds)
     ```
+
+    ``spark_catalog`` is for delta tables as it only support this naming format.
+
+    Iceberg catalog will only be seen after a table creation or interaction. So let's create a sample one:
+
+    ```sql
+    CREATE TABLE iceberg.default.sample_iceberg (
+        id INT,
+        name STRING
+    )
+    USING iceberg
+    LOCATION 's3a://lakehouse/iceberg/sample_iceberg';
+
+    INSERT INTO iceberg.default.sample_iceberg VALUES (1,'Alice'),(2,'Bob');
+
+    SELECT * FROM iceberg.default.sample_iceberg;
+
+    SHOW CATALOGS;
+    ```
+
+    You should now see both catalogs:
+
+    ```bash
+    SHOW CATALOGS;
+    +----------------+
+    |    catalog     |
+    +----------------+
+    | iceberg        |
+    | spark_catalog  |
+    +----------------+
+    2 rows selected (0.031 seconds)
+    ```
+
+    **Note:** always use fully qualified names for tables considering catalog.schema.table. `USE CATALOG iceberg` will not work.
+
+    Finally you can try the same for delta tables using `spark_catalog` and creating a table with:
+
+    ```sql
+    ...
+    USING delta
+    LOCATION 's3a://lakehouse/delta/sample_delta';
+    ```
+
+    If any errors occur, DBT will not work as well.
 
 ---
 
