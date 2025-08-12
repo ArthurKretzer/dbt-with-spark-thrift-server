@@ -114,19 +114,6 @@ services:
       SPARK_WORKER_WEBUI_PORT: 8081
     entrypoint: ["/opt/spark/bin/spark-class", "org.apache.spark.deploy.worker.Worker", "spark://spark-master:7077", "--cores", "2", "--memory", "4G"]
     networks: [ data-lake-network ]
-
-  spark-history:
-    build: ./thrift_server
-    container_name: spark-history
-    env_file:
-      - ./thrift_server/.env
-    environment:
-      SPARK_MODE: history
-    command: ["/opt/spark/bin/spark-class","org.apache.spark.deploy.history.HistoryServer"]
-    ports:
-      - "18080:18080"
-    networks: [ data-lake-network ]
-    depends_on: [ hive-metastore ]
   
   spark-thrift-iceberg:
     build: ./thrift_server
