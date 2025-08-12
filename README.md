@@ -115,13 +115,15 @@ dbt debug
 Run all models:
 
 ```bash
-dbt run
+dbt run --target delta_thrift --select path:models/delta
+dbt run --target iceberg_thrift --select path:models/iceberg
 ```
 
 Rebuild from scratch (drops and recreates tables):
 
 ```bash
-dbt run --full-refresh
+dbt run --full-refresh --target delta_thrift --select path:models/delta
+dbt run --full-refresh --target iceberg_thrift --select path:models/iceberg
 ```
 
 You can edit or add models inside ``spark_dbt_project/models/`` and rerun ``dbt run``.
@@ -152,7 +154,7 @@ You can manually test the Spark Thrift Server connection using Beeline, the JDBC
     !connect jdbc:hive2://localhost:10000
     ```
 
-    >>If authentication is not required, just press Enter when prompted for username and password.
+    >If authentication is not required, just press Enter when prompted for username and password.
 
 4. Run some tests:
 
@@ -219,11 +221,7 @@ You can manually test the Spark Thrift Server connection using Beeline, the JDBC
 
 ## Gotchas
 
-- **One warehouse & consistent URIs**: use the same spark.sql.warehouse.dir and S3A config across producers/consumers so paths resolve identically.
-
-- **Threads/Concurrency in dbt**: if you switch catalogs inside hooks, keep threads: 1, or run Delta and Iceberg builds separately to avoid session cross-talk.
-
-- **Hive reading Delta**: HMS registration makes the table discoverable, but vanilla Hive can’t read Delta without special connectors. Spark/Trino/Athena need their own Delta readers (e.g., symlink manifest for Presto/Athena if needed).
+- Although we can configure a spark session to have two catalogs (delta and iceberg) and a thrift server as such, we can't configure DBT to accept the catalog specification as stated [in the docs](https://docs.getdbt.com/reference/resource-configs/spark-configs#always-schema-never-database).
 
 ---
 

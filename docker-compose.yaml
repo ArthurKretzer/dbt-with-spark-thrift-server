@@ -78,11 +78,34 @@ services:
         max-size: "50m"
         max-file: "1"
 
-  spark-thrift:
+  spark-thrift-iceberg:
     build: ./thrift_server
     env_file:
       - ./thrift_server/.env
-    container_name: spark-thrift
+    container_name: spark-thrift-iceberg
+    environment:
+      SPARK_ENGINE: iceberg
+    ports:
+      - 10001:10000
+      - 7078:7077
+      - 8081:8080
+    networks:
+      - data-lake-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "1"
+    depends_on:
+      - hive-metastore
+  
+  spark-thrift-delta:
+    build: ./thrift_server
+    env_file:
+      - ./thrift_server/.env
+    container_name: spark-thrift-delta
+    environment:
+      SPARK_ENGINE: delta
     ports:
       - 10000:10000
       - 7077:7077

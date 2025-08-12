@@ -1,40 +1,24 @@
-spark_delta_project:
-  target: delta
+spark_dbt_project:
+  target: delta_thrift
   outputs:
-    delta:
+    delta_thrift:
       type: spark
       method: thrift
-      schema: default
       host: localhost
       port: 10000
-      thrift_transport: binary
+      schema: delta
       authentication: NOSASL
-      file_format: delta
       connect_retries: 3
-      connect_timeout: 3
+      connect_timeout: 10
       retry_all: true
 
-spark_iceberg_project:
-  target: delta
-  outputs:
-    delta:
+    iceberg_thrift:
       type: spark
       method: thrift
-      schema: default
       host: localhost
-      port: 10000
-      thrift_transport: binary
+      port: 10001
+      schema: iceberg
       authentication: NOSASL
-      file_format: iceberg
       connect_retries: 3
-      connect_timeout: 3
+      connect_timeout: 10
       retry_all: true
-
-spark_hive_project:
-  target:
-  outputs:
-    hive:
-      type: hive
-      host: localhost
-      port: 10000 # default value: 10000
-      schema: default
