@@ -111,6 +111,7 @@ Once your containers are running and environment is ready:
 Debug the DBT connection:
 
 ```bash
+cd spark_dbt_project
 dbt debug
 ```
 
